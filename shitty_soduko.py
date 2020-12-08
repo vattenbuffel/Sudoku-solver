@@ -3,128 +3,136 @@ from generate_soduko import generate_soduko
 
 n_num = 9
 
-print("Input the desired difficulty, Easy, Medium, Hard, Insane")
-level = input()
-board = generate_soduko(level)
-print(board)
+#print("Input the desired difficulty, Easy, Medium, Hard, Insane")
+#level = input()
+#board = generate_soduko(level)
+board = generate_soduko("Medium")
 
 
-def row_check_incompleteness(row, board):
-    zero_counter = 0
-    zero_index = -1
-    num_found = []
 
-    for index, num  in enumerate(row):
-        if num == 0:
-            zero_counter += 1
-            zero_index = index
-        else:
-            num_found.append(num)
+class Cell():
+    def __init__(self,row, col, num=None):
+        self.row = row
+        self.col = col
+        self.num = 0
+        self.possible_nums = set(np.arange(1,n_num+1))
+        self.solved = False
 
-    if not zero_counter == 1:
-        return False
+        # If it gets a num at start it's already solved
+        if num is not None:
+            self.possible_nums = set()
+            self.solved = True
+            self.num = num
 
+
+    # Returns true of something changes
+    def update_possible_num(self, num):
+        original_length = len(self.possible_nums)
+        self.possible_nums.difference_update(num)
+        return not original_length == len(self.possible_nums)
+
+    def check_if_only_one_possible_num(self):
+        if len(self.possible_nums) == 1:
+            self.num = list(self.possible_nums)[0]
+            self.solved = True
+
+    def __str__(self):
+        return "Row: " + str(self.row) + ". Col: " + str(self.col) + ". Num: " + str(self.num) 
+
+def cell_board(board):
+    board_ = []
+    for row_index,row in enumerate(board):
+        for col,num_ in enumerate(row):
+            num_ = num_ if not num_==0 else None 
+            cell = Cell(row_index, col, num = num_)
+            board_.append(cell)
     
-    for num in range(1,n_num+1):
-        if num in num_found:
-            continue
-        row[zero_index] = num
-        return True
+    board_ = np.array(board_, dtype='object')
+    board_ = board_.reshape(n_num,n_num)
+    return board_
 
-def col_check_incompleteness(col, board):
-    board_transpose = np.transpose(board)
-    row = np.transpose(col)
-    return row_check_incompleteness(row, board_transpose)
 
-def row_blocked(row, board):
-    zero_index = []
-    num_found = []
+def cells_print(cells):
+    # Handle case where it's only 1 element
+    if cells.size == 1:
+        print(cells.num)
+        return
 
-    # Where is it empty
-    for index, num in enumerate(row):
-        if num == 0:
-            zero_index.append(index)
+    # Handle the case where cells is 1D
+    row_vector = False
+    col_vector = False
+    if len(cells.shape) == 1:
+        # If it's a row vector:
+        if cells[0].row == cells[1].row:
+            row_vector = True
         else:
-            num_found.append(num)
+            col_vector = True
 
-    # Which values are possible to enter
-    possible_num = []
-    for num in range(1,n_num+1):
-        if num not in num_found:
-            possible_num.append(num)
-
-    update_something = False
-    # Loop over all the empty cells and check if the col allows the entrance of the possible_num while the other cols don't
-    for i in zero_index:
-        col = board[:,i]
-        
-        for num in possible_num:
-            # Is the num in this col
-            if num not in col:
-                # Is the num in all the other cols with 0 index
-                all_other_cols = zero_index.copy()
-                all_other_cols.remove(i)
-                num_in_all_other_cols = np.sum(board[:,all_other_cols]==num,axis=0)
-                num_in_all_other_cols = all(num_in_all_other_cols)
-                if num_in_all_other_cols:
-                    row[i] = num
-                    update_something = True
+    cells_ = np.zeros(cells.shape, dtype='int')
+    for cell in cells.reshape(-1):
+        if row_vector:
+            cells_[cell.col] = cell.num
+        elif col_vector:
+            cells_[cell.row] = cell.num
+        else:
+            cells_[cell.row, cell.col] = cell.num
     
-    return update_something
+    print(cells_)
 
 
-def col_blocked(col, board):
-    row = np.transpose(col)
-    board_transpose = np.transpose(board)
-    return row_blocked(row, board_transpose)
+def get_num_from_list_of_cells(list_of_cells):
+    nums = np.zeros(board.shape, dtype='int')
+    for cell in list_of_cells.reshape(-1):
+        nums[cell.row, cell.col] = cell.num
+
+    return nums.reshape(-1)
+
+
+def row_check_incompleteness(row):
+    nums = get_num_from_list_of_cells(row)
+
+    changed_something = False
+    for cell in row:
+        changed_something |= cell.update_possible_num(nums)
+    
+    return changed_something
+    
+
+def col_check_incompleteness(col):
+    return row_check_incompleteness(col)
 
 
 # There should be the number 1-9 in every 3x3 square
 def complete_square(square):
+    nums = get_num_from_list_of_cells(square)
+    
     # If the square is already completed
-    if 0 not in square:
+    if 0 not in nums:
         return False
 
-    num_not_in_square = 0
-
-    for num in range(1, n_num+1):
-        if num not in square:
-            if not (num_not_in_square == 0):
-                return False
-
-            num_not_in_square = num
-
-    empty_index = np.where(square == 0)
-    square[empty_index] = num_not_in_square   
-    return True 
+    changed_something = False
+    for cell in square.reshape(-1):
+        changed_something |= cell.update_possible_num(nums)
+    
+    return changed_something
 
 
-
-
-
+board = cell_board(board)
+cells_print(board)
 
 done = False
 while not done:
     update_something = False
+
     # Check row incompletness
-    for row_i in range(n_num):
-        row = board[row_i,:]
-        update_something |= row_check_incompleteness(row, board)
-        
-    # Check col incompletness 
-    for col_i in range(n_num):
-        col = board[:,col_i]
-        update_something |= col_check_incompleteness(col, board)
+    for i in range(n_num):
+        row = board[i,:]
+        update_something |= row_check_incompleteness(row)
 
-    # Check if there are any cells in which values can be added because the rest of the row is blocked for 
-    for row_i in range(n_num):
-        row = board[row_i,:]
-        update_something |= row_blocked(row, board)
-
-    # Check if there are any cells in which values can be added because the rest of the row is blocked for 
-    for col_i in range(n_num):
-        col = board[:,col_i]
-        update_something |= col_blocked(col, board)
+    # Check col incompletness
+    for i in range(n_num):
+        col = board[:,i]
+        update_something |= col_check_incompleteness(col)
 
     # Check for incomplete squares. This only works when it's the full 9x9 grid
     if n_num == 9:
@@ -135,16 +143,18 @@ while not done:
             update_something |= complete_square(square)
 
 
+    # Update all of the cells
+    for cell in board.reshape(-1):
+        cell.check_if_only_one_possible_num()
+
     # If anything was updated then start over if not the soduko is solved
-    if update_something:
-        done = False
-    else:
+    if not update_something:
         done = True
 
 
 
 print("Done:")
-print(board)
+cells_print(board)
 
 
 
