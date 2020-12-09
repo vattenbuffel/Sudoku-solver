@@ -9,7 +9,6 @@ board = generate_sudoko(level)
 
 
 
-
 class Cell():
     def __init__(self,row, col, num=None):
         self.row = row
@@ -20,7 +19,7 @@ class Cell():
 
         # If it gets a num at start it's already solved
         if num is not None:
-            self.possible_nums = set()
+            self.possible_nums = {num}
             self.solved = True
             self.num = num
 
@@ -126,95 +125,7 @@ def board_print(board):
         
 
     print(output)
-        
-
-def row_check_incompleteness(row):
-    nums = get_num_from_cells(row)
-
-    changed_something = False
-    for cell in row:
-        changed_something |= cell.update_possible_num(nums)
-    
-    return changed_something
-    
-
-def col_check_incompleteness(col):
-    return row_check_incompleteness(col)
-
-
-# There should be the number 1-9 in every 3x3 square
-def complete_square(square):
-    nums = get_num_from_cells(square)
-    
-    # If the square is already completed
-    if 0 not in nums:
-        return False
-
-    changed_something = False
-    for cell in square.reshape(-1):
-        changed_something |= cell.update_possible_num(nums)
-    
-    return changed_something
-
-
-# This functions shouldn't be necessary. How ever the sudoko generator is a bit buggy it seems.
-# I don't know if these can only appears on rows or if the can happen on cols as well. 
-# I don't know either if they can only happen with 2 numbers
-def unavoidable_squares(board):
-    # Extract all cells with 2 possible num
-    cell_with_duo_possible_nums = []
-    for cell in board.reshape(-1):
-        if len(cell.possible_nums) == 2:
-            cell_with_duo_possible_nums.append(cell)
-
-    # Group them into groups where they have the same possible_num
-    same_possible_num = []
-    for cell in cell_with_duo_possible_nums:
-        tmp_list = []
-        for cell_ in cell_with_duo_possible_nums:
-            if cell.possible_nums == cell_.possible_nums:
-                tmp_list.append(cell_)
-            
-        # There must be 4 cells for it to be possible
-        if len(tmp_list) == 4:
-            same_possible_num.append(tmp_list)
-    
-    # Make sure the lists in same_possible_num is unique.
-    same_possible_num_unique = []
-    for cells in same_possible_num:
-        set1 = set(cells)
-        if not set1 in same_possible_num_unique:
-            same_possible_num_unique.append(set1)
-
-    same_possible_num_unique = [list(cells) for cells in same_possible_num_unique]
-
-
-    # Make sure they are actually unavoidable squares, i.e. there are 2 at each row and each column
-    unavoidable_squares_list = []
-    for list_ in same_possible_num_unique:
-        rows = set()
-        cols = set()
-        for cell in list_:
-            rows.add(cell.row)
-            cols.add(cell.col)
-
-        correct_rows = len(list(rows)) == 2
-        correct_cols = len(list(cols)) == 2
-        if correct_cols and correct_rows:
-            unavoidable_squares_list.append(list_)
-
-
-    # If there are any lists in same_possible_num that means the numbers can be input in any way
-    update_something = False
-    for list_ in unavoidable_squares_list:
-        num = list_[0].possible_nums
-        num = list(num)[0]
-
-        list_[0].update_possible_num([num])
-        update_something = True
-
-    return update_something
-    
+         
 # Remove nums by logic exclusion
 def exclusion_cells(cells):
     possible_nums = []
@@ -324,7 +235,6 @@ def naked_pairs_square(board, square):
 
     return changed_something
     
-
 # Check if any duplicates in cells
 def check_correctness_cells(cells):
     cell_num = get_num_from_cells(cells)
@@ -386,67 +296,31 @@ done = False
 while not done:
     update_something = False
 
-    #Check row incompletness
+    # Analyze rows
     for i in range(n_num):
         row = board[i,:]
-        update_something |= row_check_incompleteness(row)
-        
+        update_something |= exclusion_cells_row(row)
 
-    # Check col incompletness
+
+    # Analyze cols
     for i in range(n_num):
         col = board[:,i]
-        update_something |= col_check_incompleteness(col)
-    
+        update_something |= exclusion_cells_col(col)
 
-    # Check for incomplete squares. This only works when it's the full 9x9 grid
+
+    # Analyze squares
     if n_num == 9:
         for square_i in range(0, n_num):
             row_i = (square_i // 3)*3
             col_i = (square_i % 3)*3
             square = board[row_i:row_i+3, col_i:col_i+3]
-            update_something |= complete_square(square)
-    
-
-    # If nothing updated with the above that means the normal operators didn't find anything. 
-    # Then analyzing techniques will have to be used. These are slower, I think.
-    if not update_something:
-        # Analyze rows
-        for i in range(n_num):
-            row = board[i,:]
-            update_something |= exclusion_cells_row(row)
-
-
-        # Analyze cols
-        for i in range(n_num):
-            col = board[:,i]
-            update_something |= exclusion_cells_col(col)
-
-
-        # Analyze squares
-        if n_num == 9:
-            for square_i in range(0, n_num):
-                row_i = (square_i // 3)*3
-                col_i = (square_i % 3)*3
-                square = board[row_i:row_i+3, col_i:col_i+3]
-                update_something |= exclusion_cells_square(square)
-                update_something |= naked_pairs_square(board, square) # Can this be removed
-
-
-    # If even the analyzing techniques didn't find anything we need to move on to the ever slower things.
-    if not update_something:
-        # That this has to be done is actually a bug
-        update_something |= unavoidable_squares(board)
+            update_something |= exclusion_cells_square(square)
+            #update_something |= naked_pairs_square(board, square) # Can this be removed, maybe. It seems like a very powerful tool but maybe it's already included in the other stuff. I'm not entierly sure
        
-
 
     # Update all of the cells
     for cell in board.reshape(-1):
         cell.check_if_only_one_possible_num()
-
-    # Check if the board is a correct one
-    correct = check_correctness_of_board(board)
-    if not correct:
-        break
 
     # If anything was updated then start over if not the soduko is solved
     if not update_something:
