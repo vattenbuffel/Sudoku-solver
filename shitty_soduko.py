@@ -1,32 +1,12 @@
 import numpy as np
-from generate_soduko import generate_soduko
+from sudoku_generator import generate_sudoko
 
 n_num = 9
 
-# print("Input the desired difficulty, Easy, Medium, Hard, Insane")
-# level = input()
-# board = generate_soduko(level)
-#board = generate_soduko("Medium")
+print("Input the desired difficulty, easy, medium, hard, extreme")
+level = input()
+board = generate_sudoko(level)
 
-# board = np.array([  [0 ,9 ,0 ,0 ,0 ,0 ,0 ,1 ,0],
-#                     [1 ,8 ,0 ,6 ,0 ,0 ,2 ,0 ,0],
-#                     [0 ,0 ,0 ,0 ,0 ,0 ,6 ,0 ,0],
-#                     [0 ,0 ,1 ,0 ,0 ,0 ,5 ,3 ,8],
-#                     [0 ,0 ,2 ,5 ,0 ,0 ,7 ,0 ,0],
-#                     [7 ,6 ,0 ,0 ,8 ,1 ,0 ,0 ,0],
-#                     [5 ,0 ,0 ,0 ,4 ,0 ,9 ,0 ,6],
-#                     [0 ,0 ,0 ,0 ,0 ,9 ,0 ,7 ,0],
-#                     [0 ,7 ,0 ,0 ,0 ,0 ,0 ,0 ,3]])
-
-board = np.array([  [8 ,2 ,0 ,0 ,0 ,0 ,6 ,0 ,1],
-                    [6 ,9 ,0 ,1 ,2 ,0 ,8 ,0 ,3],
-                    [0 ,0 ,0 ,0 ,0 ,3 ,0 ,0 ,2],
-                    [0 ,4 ,0 ,0 ,0 ,6 ,7 ,0 ,8],
-                    [7 ,1 ,0 ,5 ,0 ,0 ,0 ,0 ,6],
-                    [0 ,3 ,0 ,0 ,8 ,0 ,0 ,0 ,0],
-                    [0 ,8 ,0 ,0 ,0 ,0 ,1 ,2 ,0],
-                    [0 ,0 ,0 ,2 ,0 ,1 ,0 ,0 ,7],
-                    [0 ,7 ,2 ,3 ,9 ,0 ,0 ,0 ,4]])
 
 
 
@@ -449,7 +429,7 @@ while not done:
                 col_i = (square_i % 3)*3
                 square = board[row_i:row_i+3, col_i:col_i+3]
                 update_something |= exclusion_cells_square(square)
-                update_something |= naked_pairs_square(board, square)
+                update_something |= naked_pairs_square(board, square) # Can this be removed
 
 
     # If even the analyzing techniques didn't find anything we need to move on to the ever slower things.
@@ -483,6 +463,7 @@ if not correct:
     print("Incorrect solution generated")
 else:
     print("Done:")
+
 board_print(board)
 
 
