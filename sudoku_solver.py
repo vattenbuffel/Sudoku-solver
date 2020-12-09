@@ -1,22 +1,19 @@
 import z3
 import numpy as np
+import time
+from generate_soduko import generate_soduko
 
-
+t0=time.time()
+print(t0)
+print("Input desired difficulty Easy Medium, Hard, Insane")
+board=generate_soduko(input())
+t1=time.time()
 m=z3.Solver()
 
 
 #For a 9x9 sodk
 n=9
-board = np.array(  [[6, 0, 3, 0, 0, 0, 0, 7, 0],
-                    [7, 2, 0, 0, 0, 0, 3, 0, 0],
-                    [5, 0, 0, 0, 3, 7, 1, 0, 9],
-                    [0, 0, 0, 5, 0, 2, 6, 3, 0],
-                    [0, 1, 0, 0, 7, 6, 0, 9, 0],
-                    [0, 3, 0, 0, 4, 0, 0, 2, 7],
-                    [8, 4, 0, 0, 1, 0, 0, 0, 0],
-                    [0, 0, 0, 4, 0, 0, 0, 0, 0],
-                    [0, 0, 0, 9, 2, 0, 8, 4, 3]])
-
+#
 
 
 #Create decision vars
@@ -44,12 +41,12 @@ for i in range(n):
 for row in range(n):
     #xy[row] returns array in row row
     #convert to list coz z3 syntax
-    m.add(z3.Distinct(list(xy[row])))
+    m.add(z3.Distinct(list(xy[row,:])))
         
 #Each colulm must have unique numbers /distinct
 
 for col in range(n):
-    m.add(z3.Distinct(list(xy[col])))
+    m.add(z3.Distinct(list(xy[:,col])))
 
 
 #Each 3x3 submatrix must have unique numbers
@@ -82,5 +79,10 @@ for row in range(n):
     for col in range(n):
         sol_readable[row][col]=str(sol.evaluate(xy[row][col]))
 
-
+if str(m.check()) == "sat":
+    print("Solved model :")
 print(sol_readable)
+
+t2=time.time()
+
+print(f"Genration time : {t1-t0} s \nSolving time : {t2-t1} s")
