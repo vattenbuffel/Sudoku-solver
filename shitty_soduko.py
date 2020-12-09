@@ -98,7 +98,7 @@ def get_num_from_cells(cells):
             col_vector = True
             y = cells.shape[0]
     else:
-        x,y = cells.shape
+        y,x = cells.shape
 
     nums = np.zeros(cells.shape, dtype='int')
     
@@ -112,7 +112,7 @@ def get_num_from_cells(cells):
             row = i
             nums[row] = cell.num
         else:
-            row = (i // y)
+            row = (i // x)
             col = (i % x)
             nums[row, col] = cell.num
     
@@ -199,7 +199,7 @@ def unavoidable_squares(board):
         if len(tmp_list) == 4:
             same_possible_num.append(tmp_list)
     
-    # Make sure the lists in same_possible_num is unique. There will always be 4 duplicates
+    # Make sure the lists in same_possible_num is unique.
     same_possible_num_unique = []
     for cells in same_possible_num:
         set1 = set(cells)
@@ -275,6 +275,76 @@ def exclusion_cells_col(col):
 def exclusion_cells_square(square):
     return exclusion_cells(square.reshape(-1))
 
+# Handle naked pairs
+def naked_pairs_square(board, square):
+    possible_nums = []
+
+    cells_as_row = square.reshape(-1)
+    for cell in cells_as_row:
+        if not cell.possible_nums == set():
+            possible_nums.append(cell.possible_nums)
+    possible_nums = np.array(possible_nums)
+
+    # Check if multiple sets are the same
+    n_copies = np.zeros((square.size,), dtype='int')
+    for i, set_ in enumerate(possible_nums):
+        for set__ in possible_nums:
+           n_copies[i] += set_==set__ 
+
+    # If there are a possible num set with n elements there needs to be n cells with that possible num sets for anything to be excluded
+    good_possible_nums = []
+    for i in range(0,possible_nums.size):
+        if len(possible_nums[i]) == n_copies[i]:
+            good_possible_nums.append(possible_nums[i])
+    
+    # Only if the matching pairs are on the same row or col can they be used. Extract those who are
+    row_pairs = []
+    col_pairs = []
+    pairs = []
+    for possible_nums_ in good_possible_nums:
+        tmp_list = []
+        for cell in cells_as_row:
+            if cell.possible_nums == possible_nums_:
+               tmp_list.append(cell)
+        
+        pairs.append(tmp_list)
+    
+    for pair in pairs:
+        row = pair[0].row
+        col = pair[0].col 
+        
+        row_pair = True
+        col_pair = True
+        for cell in pair:
+            if not cell.row == row:
+                row_pair = False
+            if not cell.col == col:
+                col_pair = False
+        
+        if row_pair:
+            row_pairs.append(pair)
+        elif col_pair:
+            col_pairs.append(pair)
+    
+    # The other cells in the row/col are blocked because of these row/col pairs
+    changed_something = False
+    for pair in row_pairs:
+        update_set = pair[0].possible_nums
+        row = board[pair[0].row, :]
+        for cell in row:
+            if not cell.possible_nums == update_set:
+                changed_something |= cell.update_possible_num(update_set)
+    
+    for pair in col_pairs:
+        update_set = pair[0].possible_nums
+        col = board[:,pair[0].col]
+        for cell in col:
+            if not cell.possible_nums == update_set:
+                changed_something |= cell.update_possible_num(update_set)
+
+    return changed_something
+    
+
 # Check if any duplicates in cells
 def check_correctness_cells(cells):
     cell_num = get_num_from_cells(cells)
@@ -319,6 +389,8 @@ def check_correctness_of_board(board):
 board = cell_board(board)
 board_print(board)
 
+
+# Remove this
 def update_and_error_check(board):
     # Update all of the cells
     for cell in board.reshape(-1):
@@ -334,7 +406,7 @@ done = False
 while not done:
     update_something = False
 
-    # Check row incompletness
+    #Check row incompletness
     for i in range(n_num):
         row = board[i,:]
         update_something |= row_check_incompleteness(row)
@@ -370,13 +442,14 @@ while not done:
             update_something |= exclusion_cells_col(col)
 
 
-        # Check for incomplete squares. This only works when it's the full 9x9 grid
+        # Analyze squares
         if n_num == 9:
             for square_i in range(0, n_num):
                 row_i = (square_i // 3)*3
                 col_i = (square_i % 3)*3
                 square = board[row_i:row_i+3, col_i:col_i+3]
                 update_something |= exclusion_cells_square(square)
+                update_something |= naked_pairs_square(board, square)
 
 
     # If even the analyzing techniques didn't find anything we need to move on to the ever slower things.
