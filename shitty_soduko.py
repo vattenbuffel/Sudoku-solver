@@ -6,7 +6,7 @@ n_num = 9
 # print("Input the desired difficulty, Easy, Medium, Hard, Insane")
 # level = input()
 # board = generate_soduko(level)
-board = generate_soduko("Medium")
+#board = generate_soduko("Medium")
 
 # board = np.array([  [0 ,9 ,0 ,0 ,0 ,0 ,0 ,1 ,0],
 #                     [1 ,8 ,0 ,6 ,0 ,0 ,2 ,0 ,0],
@@ -17,6 +17,16 @@ board = generate_soduko("Medium")
 #                     [5 ,0 ,0 ,0 ,4 ,0 ,9 ,0 ,6],
 #                     [0 ,0 ,0 ,0 ,0 ,9 ,0 ,7 ,0],
 #                     [0 ,7 ,0 ,0 ,0 ,0 ,0 ,0 ,3]])
+
+board = np.array([  [8 ,2 ,0 ,0 ,0 ,0 ,6 ,0 ,1],
+                    [6 ,9 ,0 ,1 ,2 ,0 ,8 ,0 ,3],
+                    [0 ,0 ,0 ,0 ,0 ,3 ,0 ,0 ,2],
+                    [0 ,4 ,0 ,0 ,0 ,6 ,7 ,0 ,8],
+                    [7 ,1 ,0 ,5 ,0 ,0 ,0 ,0 ,6],
+                    [0 ,3 ,0 ,0 ,8 ,0 ,0 ,0 ,0],
+                    [0 ,8 ,0 ,0 ,0 ,0 ,1 ,2 ,0],
+                    [0 ,0 ,0 ,2 ,0 ,1 ,0 ,0 ,7],
+                    [0 ,7 ,2 ,3 ,9 ,0 ,0 ,0 ,4]])
 
 
 
@@ -37,9 +47,16 @@ class Cell():
 
     # Returns true of something changes
     def update_possible_num(self, num):
+        if self.solved:
+            return False
+
         original_length = len(self.possible_nums)
         self.possible_nums.difference_update(num)
-        return not original_length == len(self.possible_nums)
+        new_length = len(self.possible_nums)
+
+        if new_length <= 0:
+            raise Exception("BALLE")
+        return not original_length == new_length
 
     def check_if_only_one_possible_num(self):
         if len(self.possible_nums) == 1:
@@ -61,33 +78,6 @@ def cell_board(board):
     board_ = board_.reshape(board.shape)
     return board_
 
-
-def cells_print(cells):
-    # Handle case where it's only 1 element
-    if cells.size == 1:
-        print(cells.num)
-        return
-
-    # Handle the case where cells is 1D
-    row_vector = False
-    col_vector = False
-    if len(cells.shape) == 1:
-        # If it's a row vector:
-        if cells[0].row == cells[1].row:
-            row_vector = True
-        else:
-            col_vector = True
-
-    cells_ = np.zeros(cells.shape, dtype='int')
-    for cell in cells.reshape(-1):
-        if row_vector:
-            cells_[cell.col] = cell.num
-        elif col_vector:
-            cells_[cell.row] = cell.num
-        else:
-            cells_[cell.row, cell.col] = cell.num
-    
-    print(cells_)
 
 def get_num_from_cells(cells):
     # Handle case where it's only 1 element
@@ -128,6 +118,35 @@ def get_num_from_cells(cells):
     
     return nums.reshape(-1)
 
+def cells_print(cells):
+    nums = get_num_from_cells(cells)
+    nums = nums.reshape(cells.shape)
+    
+    print(nums)
+
+def board_print(board):
+    nums = get_num_from_cells(board)
+    n_rows, n_cols = board.shape
+    output = ""
+    for i in range(nums.size):
+        col = (i % n_cols)
+        row = i // n_rows
+
+        if col == 0:
+            output+="["
+        elif col%3 == 0 and not  col == n_cols - 1:
+            output+="]["
+
+        output += " " + str(nums[i]) + " "
+
+        if col == n_cols-1:
+            output+="]\n"
+            if (row+1) %3 == 0 and (not row == 0 and not row == n_rows-1):
+                output+="-"*33 + "\n"
+        
+
+    print(output)
+        
 
 def row_check_incompleteness(row):
     nums = get_num_from_cells(row)
@@ -171,20 +190,24 @@ def unavoidable_squares(board):
     # Group them into groups where they have the same possible_num
     same_possible_num = []
     for cell in cell_with_duo_possible_nums:
-        tmp_list = [cell]
+        tmp_list = []
         for cell_ in cell_with_duo_possible_nums:
             if cell.possible_nums == cell_.possible_nums:
                 tmp_list.append(cell_)
             
-            # There must be 4 cells for it to be possible
-            if len(tmp_list) == 4:
-                same_possible_num.append(tmp_list)
+        # There must be 4 cells for it to be possible
+        if len(tmp_list) == 4:
+            same_possible_num.append(tmp_list)
     
     # Make sure the lists in same_possible_num is unique. There will always be 4 duplicates
     same_possible_num_unique = []
-    for i in range(len(same_possible_num)):
-        if i % 4 == 0:
-            same_possible_num_unique.append(same_possible_num[i])
+    for cells in same_possible_num:
+        set1 = set(cells)
+        if not set1 in same_possible_num_unique:
+            same_possible_num_unique.append(set1)
+
+    same_possible_num_unique = [list(cells) for cells in same_possible_num_unique]
+
 
     # Make sure they are actually unavoidable squares, i.e. there are 2 at each row and each column
     unavoidable_squares_list = []
@@ -294,7 +317,7 @@ def check_correctness_of_board(board):
     return correct
 
 board = cell_board(board)
-cells_print(board)
+board_print(board)
 
 def update_and_error_check(board):
     # Update all of the cells
@@ -315,7 +338,7 @@ while not done:
     for i in range(n_num):
         row = board[i,:]
         update_something |= row_check_incompleteness(row)
-    
+        
 
     # Check col incompletness
     for i in range(n_num):
@@ -348,7 +371,6 @@ while not done:
 
 
         # Check for incomplete squares. This only works when it's the full 9x9 grid
-        last_good_board = np.copy(board)
         if n_num == 9:
             for square_i in range(0, n_num):
                 row_i = (square_i // 3)*3
@@ -377,14 +399,18 @@ while not done:
     if not update_something:
         done = True
 
-
+for square_i in range(0, n_num):
+    row_i = (square_i // 3)*3
+    col_i = (square_i % 3)*3
+    square = board[row_i:row_i+3, col_i:col_i+3]
+    update_something |= exclusion_cells_square(square)
 
 correct = check_correctness_of_board(board)
 if not correct:
     print("Incorrect solution generated")
 else:
     print("Done:")
-cells_print(board)
+board_print(board)
 
 
 
