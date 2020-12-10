@@ -1,12 +1,21 @@
 import numpy as np
 from sudoku_generator import generate_sudoko
+import itertools
 
 n_num = 9
 
-print("Input the desired difficulty, easy, medium, hard, extreme")
-level = input()
-board = generate_sudoko(level)
-
+# print("Input the desired difficulty, easy, medium, hard, extreme")
+# level = input()
+# board = generate_sudoko(level)
+board = np.array([[0, 0, 8, 0, 0, 6, 0, 0, 0],
+[0, 0, 0, 0, 0, 0, 7, 0, 0],
+[3, 5, 0, 0, 0, 0, 0, 0, 2],
+[0, 0, 3, 0, 8, 7, 0, 0, 0],
+[0, 0, 0, 0, 0, 0, 0, 1, 0],
+[5, 4, 6, 0, 0, 0, 0, 0, 9],
+[9, 8, 0, 5, 0, 0, 0, 0, 0],
+[1, 0, 0, 7, 0, 0, 6, 0, 5],
+[0, 0, 0, 4, 1, 2, 0, 0, 0]])
 
 
 class Cell():
@@ -43,7 +52,7 @@ class Cell():
             self.solved = True
 
     def __str__(self):
-        return "Row: " + str(self.row) + ". Col: " + str(self.col) + ". Num: " + str(self.num) 
+        return "Row: " + str(self.row) + ". Col: " + str(self.col) + ". Num: " + str(self.num) + ". Possible nums: " + str(self.possible_nums) 
 
 def cell_board(board):
     board_ = []
@@ -166,6 +175,106 @@ def exclusion_cells_col(col):
 def exclusion_cells_square(square):
     return exclusion_cells(square.reshape(-1))
 
+def print_seed(board):
+    output = ""
+    for cell in board.reshape(-1):
+        if cell.num == 0:
+            output += " "
+        else:
+            output += str(cell.num)
+    print(output)
+
+# Solve hidden numbers, https://www.sudoku-solutions.com/index.php?section=solvingHiddenSubsets#hiddenSingle
+def find_hidden_num_cells(cells):
+    cells = cells.reshape(-1)
+    
+    # Find n possible nums which are unique to n cells
+    cells_with_unique_possible_num = []
+    checked_sets = []
+    for cell in cells:
+        possible_sets = [set(itertools.combinations(cell.possible_nums,i)) for i in range(1,len(list(cell.possible_nums))+1)]
+
+        # Convert the touple in possible_sets to sets
+        possible_sets_ = []
+        for set_ in possible_sets:
+            for set__ in set_:
+                if type(set__) == tuple:
+                    possible_sets_.append(set(list(set__)))
+                else:
+                    possible_sets_.append({set__})
+        
+        possible_sets = possible_sets_
+        
+        for set_ in possible_sets:
+            if not set_ in checked_sets:
+                cells_with_sets = []
+                checked_sets.append(set_)
+                for cell_ in cells:
+                    if set_.issubset(cell_.possible_nums):
+                        cells_with_sets.append(cell_)
+                
+                if len(cells_with_sets) == len(list(set_)):
+                    cells_with_unique_possible_num.append([set_, cells_with_sets])
+
+    
+    # Make sure non of the elements in the unique sets is in any other set
+    cells_with_unique_possible_num_ = []
+    for list_ in cells_with_unique_possible_num:
+        nums = list_[0]
+        cells_ = list_[1]
+        
+        element_possible_in_other_cell = False
+        for cell in cells:
+            if not cell in cells_:
+                if not 0 == len(nums.intersection(cell.possible_nums)):
+                    element_possible_in_other_cell = True
+
+        if not element_possible_in_other_cell:
+            cells_with_unique_possible_num_.append(list_)
+
+    cells_with_unique_possible_num = cells_with_unique_possible_num_
+
+
+    # Remove all the non unique possible nums from the cells with unique possible nums
+    update_something = False
+    for list_ in cells_with_unique_possible_num:
+        nums = list_[0]
+        cells_ = list_[1]
+        for cell in cells_:
+            update_set = set([i for i in range(1,n_num+1)]) - nums
+            update_something |= cell.update_possible_num(update_set)
+    
+    return update_something
+
+def find_hidden_num_square(square):
+    return find_hidden_num_cells(square)
+
+def find_hidden_num_row(row):
+    return find_hidden_num_cells(row)
+
+def find_hidden_num_col(col):
+    return find_hidden_num_cells(col)
+    
+# Find pointing nummbers : https://www.sudoku-solutions.com/index.php?section=solvingInteractions#pointingPair
+def pointing_num_cells(board, cells):
+    cells = cells.reshape(-1)
+
+    # Find unique 
+
+    # The cells with the unique possible nums have to be on the same row, col or square
+    # col_cells = []
+    # row_cells = []
+    # for list_ in cells_with_unique_possible_num:
+    #     nums = list_[0]
+    #     cells_ = list_[1]
+    #     col = cells_[0].col
+    #     row = cells_[0].row
+        
+    #     if all([cell.col == col for cell in cells_]):
+    #         col_cells.append(list_)
+    #     elif all([cell.row == row for cell in cells_]):
+    #         row_cells.append(list_)
+
 # Handle naked pairs
 def naked_pairs_square(board, square):
     possible_nums = []
@@ -280,18 +389,6 @@ board = cell_board(board)
 board_print(board)
 
 
-# Remove this
-def update_and_error_check(board):
-    # Update all of the cells
-    for cell in board.reshape(-1):
-        cell.check_if_only_one_possible_num()
-
-    # Check if the board is a correct one
-    correct = check_correctness_of_board(board)
-    return correct
-
-
-
 done = False
 while not done:
     update_something = False
@@ -300,12 +397,16 @@ while not done:
     for i in range(n_num):
         row = board[i,:]
         update_something |= exclusion_cells_row(row)
+        # update_something |= naked_pairs_square(board, row)
+        update_something |= find_hidden_num_row(row)
 
 
     # Analyze cols
     for i in range(n_num):
         col = board[:,i]
         update_something |= exclusion_cells_col(col)
+        # update_something |= naked_pairs_square(board, col)
+        update_something |= find_hidden_num_col(col)
 
 
     # Analyze squares
@@ -315,7 +416,8 @@ while not done:
             col_i = (square_i % 3)*3
             square = board[row_i:row_i+3, col_i:col_i+3]
             update_something |= exclusion_cells_square(square)
-            #update_something |= naked_pairs_square(board, square) # Can this be removed, maybe. It seems like a very powerful tool but maybe it's already included in the other stuff. I'm not entierly sure
+            update_something |= find_hidden_num_square(square)
+            # update_something |= naked_pairs_square(board, square) # Can this be removed, maybe. It seems like a very powerful tool but maybe it's already included in the other stuff. I'm not entierly sure
        
 
     # Update all of the cells
@@ -337,6 +439,15 @@ if not correct:
     print("Incorrect solution generated")
 else:
     print("Done:")
+
+
+
+# REMOVE THIS
+col = board[:,0]
+balle = pointing_num_cells(board, col)
+
+###############
+
 
 board_print(board)
 
