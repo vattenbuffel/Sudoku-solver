@@ -255,7 +255,7 @@ def find_hidden_num_row(row):
 def find_hidden_num_col(col):
     return find_hidden_num_cells(col)
     
-# Find pointing nummbers : https://www.sudoku-solutions.com/index.php?section=solvingInteractions#pointingPair
+# 
 def pointing_num_cells(board, cells):
     cells = cells.reshape(-1)
 
@@ -275,44 +275,78 @@ def pointing_num_cells(board, cells):
     #     elif all([cell.row == row for cell in cells_]):
     #         row_cells.append(list_)
 
-# Handle naked pairs
-def naked_pairs_square(board, square):
+#Find pointing nummbers : https://www.sudoku-solutions.com/index.php?section=solvingInteractions#pointingPair
+def pointing_numbers_cells(board, cells, cell_type):
+    cells = cells.reshape(-1)
+
+    # Find all unique possible nums inside the given cells
     possible_nums = []
+    for cell in cells:
+        possible_sets = [set(itertools.combinations(cell.possible_nums,i)) for i in range(1,len(list(cell.possible_nums))+1)]
+        
+        # Save all the possible nums
+        for set_ in possible_sets:
+            for set__ in set_:
+                if not set__ in possible_nums:
+                    possible_nums.append(set(set__))
 
-    cells_as_row = square.reshape(-1)
-    for cell in cells_as_row:
-        if not cell.possible_nums == set():
-            possible_nums.append(cell.possible_nums)
-    possible_nums = np.array(possible_nums)
+    # Make sure the possible nums found are actually missing from the cells
+    cell_nums = get_num_from_cells(cells)
+    tmp_list = []
+    for possible_num in possible_nums:
+        needed = True
+        for element in list(possible_num):
+            if element in cell_nums:
+                needed = False
+                break
+        
+        if needed and not possible_num in tmp_list:
+            tmp_list.append(possible_num)
 
-    # Check if multiple sets are the same
-    n_copies = np.zeros((square.size,), dtype='int')
-    for i, set_ in enumerate(possible_nums):
-        for set__ in possible_nums:
-           n_copies[i] += set_==set__ 
+    possible_nums = tmp_list
 
-    # If there are a possible num set with n elements there needs to be n cells with that possible num sets for anything to be excluded
-    good_possible_nums = []
-    for i in range(0,possible_nums.size):
-        if len(possible_nums[i]) == n_copies[i]:
-            good_possible_nums.append(possible_nums[i])
+    # Group them into lists with the same set of possible nums
+    pairs = []
+    for possible_num in possible_nums:
+        tmp_list = []
+        for cell in cells:
+            #if possible_num.issubset():
+            if possible_num.issubset(cell.possible_nums):
+                tmp_list.append(cell)
+        pairs.append((possible_num, tmp_list))
+
+    # Make sure the possible nums for the cells cannot be in any other cell in cells
+    tmp_list = []
+    for tuple_ in pairs:
+        (possible_num, pair) = tuple_
+        can_be_in_other_cell = False
+        for cell in cells:
+            if not cell in pair:
+                for element in list(possible_num):
+                    if element in cell.possible_nums:
+                        can_be_in_other_cell = True
+                        break
+        
+        if not can_be_in_other_cell:
+            tmp_list.append(tuple_)
+
+    pairs = tmp_list
+       
+    def in_same_square(cells):
+        same_square_col = any([all([cell.row < i*3 and cell.row >= (i-1)*3 for cell in cells]) for i in range(1,4)])
+        same_square_row = any([all([cell.col < i*3 and cell.col >= (i-1)*3 for cell in cells]) for i in range(1,4)])
+        return same_square_col and same_square_row
     
-    # Only if the matching pairs are on the same row or col can they be used. Extract those who are
+    # Only if the matching pairs are on the same row, col or square can they be used. Extract those who are
     row_pairs = []
     col_pairs = []
-    pairs = []
-    for possible_nums_ in good_possible_nums:
-        tmp_list = []
-        for cell in cells_as_row:
-            if cell.possible_nums == possible_nums_:
-               tmp_list.append(cell)
-        
-        pairs.append(tmp_list)
-    
-    for pair in pairs:
+    square_pairs = []
+    for tuple_ in pairs:
+        (possible_num, pair) = tuple_
         row = pair[0].row
         col = pair[0].col 
         
+        # Check if the are row/col pairs
         row_pair = True
         col_pair = True
         for cell in pair:
@@ -320,30 +354,138 @@ def naked_pairs_square(board, square):
                 row_pair = False
             if not cell.col == col:
                 col_pair = False
+
+        # Check if they are in the same square:
+        square_pair = in_same_square(pair)
         
+        # Save the row/col pairs and their possible nums
         if row_pair:
-            row_pairs.append(pair)
+            row_pairs.append(tuple_)
         elif col_pair:
-            col_pairs.append(pair)
+            col_pairs.append(tuple_)
+        if square_pair:
+            square_pairs.append(tuple_)
     
-    # The other cells in the row/col are blocked because of these row/col pairs
+    # The col and row pair have to be in the same square
+    tmp_list = []
+    for tuple_ in col_pairs:
+        (possible_num, pair) = tuple_
+        if in_same_square(pair):
+            tmp_list.append(tuple_)
+
+    col_pairs = tmp_list
+
+    tmp_list = []
+    for tuple_ in row_pairs:
+        (possible_num, pair) = tuple_
+        if in_same_square(pair):
+            tmp_list.append(tuple_)
+
+    row_pairs = tmp_list
+
+    # The square pairs have to be in the same col or row:
+    tmp_list = []
+    for tuple_ in square_pairs:
+        (possible_num, pair) = tuple_
+        if all([cell.row == pair[0].row for cell in pair]):
+            tmp_list.append(tuple_)
+        elif all([cell.col == pair[0].col for cell in pair]):
+            tmp_list.append(tuple_)
+
+    square_pairs = tmp_list
+
+
+    # If it's a row or col pair then all the other cells in the same sqquare is blocked from having the same possible num
+    def get_square_index(cell):
+        row_i = [all([cell.row < i*3 and cell.row >= (i-1)*3]) for i in range(1,4)]
+        row_i = np.argwhere(np.array(row_i) == True)[0,0]
+        col_i = [all([cell.col < i*3 and cell.col >= (i-1)*3]) for i in range(1,4)]
+        col_i = np.argwhere(np.array(col_i) == True)[0,0]
+
+        return (row_i, col_i)
+
     changed_something = False
-    for pair in row_pairs:
-        update_set = pair[0].possible_nums
-        row = board[pair[0].row, :]
-        for cell in row:
-            if not cell.possible_nums == update_set:
-                changed_something |= cell.update_possible_num(update_set)
+    if cell_type == 'row':
+        for tuple_ in row_pairs:
+            (possible_num, pair) = tuple_
+            # Get the square they are located in
+            square_row, square_col = get_square_index(pair[0])
+            square = board[3*square_row:3*square_row+3, 3*square_col:3*square_col+3]
+            
+            for cell in square.reshape(-1):
+                if not cell in pair:
+                    changed_something |= cell.update_possible_num(possible_num)
+            
     
-    for pair in col_pairs:
-        update_set = pair[0].possible_nums
-        col = board[:,pair[0].col]
-        for cell in col:
-            if not cell.possible_nums == update_set:
-                changed_something |= cell.update_possible_num(update_set)
+    
+    if cell_type == 'col':
+        for tuple_ in col_pairs:
+            (possible_num, pair) = tuple_
+            # Get the square they are located in
+            square_row, square_col = get_square_index(pair[0])
+            square = board[3*square_row:3*square_row+3, 3*square_col:3*square_col+3]
+            
+            for cell in square.reshape(-1):
+                if not cell in pair:
+                    changed_something |= cell.update_possible_num(possible_num)
+
+
+    # If it's a square pair then all the other cells in the same row or col is blocked from having the same possible num
+    if cell_type == 'square':
+        for tuple_ in col_pairs:
+            (possible_num, pair) = tuple_
+            
+            cells_to_update = []
+            # Get the col/row they are located in
+            if pair[0].row == pair[1].row:
+                cells_to_update.append(board[:, pair[0].col])
+            elif pair[0].col == pair[1].col:
+                cells_to_update.append(board[pair[0].row, :])
+
+            
+            for cell in cells_to_update:
+                if not cell in pair:
+                    changed_something |= cell.update_possible_num(possible_num)
 
     return changed_something
-    
+
+def pointing_numbers_row(board, row):
+    return pointing_numbers_cells(board, row, 'row')
+
+def pointing_numbers_col(board, col):
+    return pointing_numbers_cells(board, col, 'col')
+
+def pointing_numbers_square(board, square):
+    return pointing_numbers_cells(board, square, 'square')
+
+
+
+# REMOVE THIS
+# board = np.array([  [0, 0, 8, 0, 0, 0, 0, 0, 0],
+#                     [0, 0, 0, 0, 0, 0, 0, 0, 0],
+#                     [3, 5, 0, 0, 0, 0, 0, 0, 0],
+#                     [2, 0, 0, 0, 0, 0, 0, 0, 0],
+#                     [8, 0, 0, 0, 0, 0, 0, 0, 0],
+#                     [5, 0, 0, 0, 0, 0, 0, 0, 9],
+#                     [9, 0, 0, 0, 0, 0, 0, 0, 0],
+#                     [1, 0, 0, 0, 0, 0, 0, 0, 0],
+#                     [0, 0, 0, 0, 0, 0, 0, 0, 0]])
+# board = cell_board(board)
+# board_print(board)
+
+# board[-1,0].update_possible_num([4])
+# col = board[:,0]
+# pointing_numbers_col(board, col)
+
+# exit()
+
+################
+
+
+
+
+
+
 # Check if any duplicates in cells
 def check_correctness_cells(cells):
     cell_num = get_num_from_cells(cells)
@@ -397,16 +539,16 @@ while not done:
     for i in range(n_num):
         row = board[i,:]
         update_something |= exclusion_cells_row(row)
-        # update_something |= naked_pairs_square(board, row)
         update_something |= find_hidden_num_row(row)
+        update_something |= pointing_numbers_row(board, row)
 
 
     # Analyze cols
     for i in range(n_num):
         col = board[:,i]
         update_something |= exclusion_cells_col(col)
-        # update_something |= naked_pairs_square(board, col)
         update_something |= find_hidden_num_col(col)
+        update_something |= pointing_numbers_col(board, col)
 
 
     # Analyze squares
@@ -417,8 +559,8 @@ while not done:
             square = board[row_i:row_i+3, col_i:col_i+3]
             update_something |= exclusion_cells_square(square)
             update_something |= find_hidden_num_square(square)
-            # update_something |= naked_pairs_square(board, square) # Can this be removed, maybe. It seems like a very powerful tool but maybe it's already included in the other stuff. I'm not entierly sure
-       
+            update_something |= pointing_numbers_square(board, square)
+            
 
     # Update all of the cells
     for cell in board.reshape(-1):
@@ -428,11 +570,6 @@ while not done:
     if not update_something:
         done = True
 
-for square_i in range(0, n_num):
-    row_i = (square_i // 3)*3
-    col_i = (square_i % 3)*3
-    square = board[row_i:row_i+3, col_i:col_i+3]
-    update_something |= exclusion_cells_square(square)
 
 correct = check_correctness_of_board(board)
 if not correct:
@@ -444,9 +581,9 @@ else:
 
 # REMOVE THIS
 col = board[:,0]
-balle = pointing_num_cells(board, col)
+balle = pointing_numbers_cells(board, col, 'col')
 
-###############
+############### 
 
 
 board_print(board)
