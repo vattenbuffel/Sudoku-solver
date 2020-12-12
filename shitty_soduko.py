@@ -4,7 +4,7 @@ import itertools
 
 n_num = 9
 
-print("Input the desired difficulty, easy, medium, hard, extreme")
+print("Input the desired difficulty(easy, medium, hard, extreme)")
 level = input()
 board = generate_sudoko(level)
 
@@ -105,28 +105,24 @@ def cells_print(cells):
     print(nums)
 
 def board_print(board):
-    nums = get_num_from_cells(board)
-    n_rows, n_cols = board.shape
-    output = ""
-    for i in range(nums.size):
-        col = (i % n_cols)
-        row = i // n_rows
+    # Stolen from https://stackoverflow.com/questions/45471152/how-to-create-a-sudoku-puzzle-in-python
+    base = int(n_num**0.5) # No fucking idea.
+    side = n_num
+    def expandLine(line):
+        return line[0]+line[5:9].join([line[1:5]*(base-1)]*base)+line[9:13]
+    line0  = expandLine("╔═══╤═══╦═══╗")
+    line1  = expandLine("║ . │ . ║ . ║")
+    line2  = expandLine("╟───┼───╫───╢")
+    line3  = expandLine("╠═══╪═══╬═══╣")
+    line4  = expandLine("╚═══╧═══╩═══╝")
 
-        if col == 0:
-            output+="["
-        elif col%3 == 0 and not  col == n_cols - 1:
-            output+="]["
+    symbol = " 1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    nums   = [ [""]+[symbol[n.num] for n in row] for row in board ]
+    print(line0)
+    for r in range(1,side+1):
+        print( "".join(n+s for n,s in zip(nums[r-1],line1.split("."))) )
+        print([line2,line3,line4][(r%side==0)+(r%base==0)])
 
-        output += " " + str(nums[i]) + " "
-
-        if col == n_cols-1:
-            output+="]\n"
-            if (row+1) %3 == 0 and (not row == 0 and not row == n_rows-1):
-                output+="-"*33 + "\n"
-        
-
-    print(output)
-         
 # Remove nums by logic exclusion
 def exclusion_cells(cells):
     possible_nums = []
@@ -167,6 +163,7 @@ def exclusion_cells_col(col):
 def exclusion_cells_square(square):
     return exclusion_cells(square.reshape(-1))
 
+# For inputting the board into a sudoko solver website
 def print_seed(board):
     output = ""
     for cell in board.reshape(-1):
@@ -483,6 +480,7 @@ def check_solved(board):
 
     return True
 
+print("Generated board")
 board = cell_board(board)
 board_print(board)
 
@@ -528,7 +526,8 @@ def try_to_solve(board):
             done = True
 
 
-
+print("Press enter to start solving")
+input()
 try_to_solve(board)
 
 # If it's not solved by now try to randomize a good number
