@@ -4,18 +4,10 @@ import itertools
 
 n_num = 9
 
-# print("Input the desired difficulty, easy, medium, hard, extreme")
-# level = input()
-# board = generate_sudoko(level)
-board = np.array([[0, 0, 8, 0, 0, 6, 0, 0, 0],
-[0, 0, 0, 0, 0, 0, 7, 0, 0],
-[3, 5, 0, 0, 0, 0, 0, 0, 2],
-[0, 0, 3, 0, 8, 7, 0, 0, 0],
-[0, 0, 0, 0, 0, 0, 0, 1, 0],
-[5, 4, 6, 0, 0, 0, 0, 0, 9],
-[9, 8, 0, 5, 0, 0, 0, 0, 0],
-[1, 0, 0, 7, 0, 0, 6, 0, 5],
-[0, 0, 0, 4, 1, 2, 0, 0, 0]])
+print("Input the desired difficulty, easy, medium, hard, extreme")
+level = input()
+board = generate_sudoko(level)
+
 
 
 class Cell():
@@ -255,26 +247,6 @@ def find_hidden_num_row(row):
 def find_hidden_num_col(col):
     return find_hidden_num_cells(col)
     
-# 
-def pointing_num_cells(board, cells):
-    cells = cells.reshape(-1)
-
-    # Find unique 
-
-    # The cells with the unique possible nums have to be on the same row, col or square
-    # col_cells = []
-    # row_cells = []
-    # for list_ in cells_with_unique_possible_num:
-    #     nums = list_[0]
-    #     cells_ = list_[1]
-    #     col = cells_[0].col
-    #     row = cells_[0].row
-        
-    #     if all([cell.col == col for cell in cells_]):
-    #         col_cells.append(list_)
-    #     elif all([cell.row == row for cell in cells_]):
-    #         row_cells.append(list_)
-
 #Find pointing nummbers : https://www.sudoku-solutions.com/index.php?section=solvingInteractions#pointingPair
 def pointing_numbers_cells(board, cells, cell_type):
     cells = cells.reshape(-1)
@@ -438,9 +410,13 @@ def pointing_numbers_cells(board, cells, cell_type):
             cells_to_update = []
             # Get the col/row they are located in
             if pair[0].row == pair[1].row:
-                cells_to_update.append(board[:, pair[0].col])
+                cells_to_update = board[pair[0].row, :]
+
+                # cells_to_update = board[:, pair[0].col]
             elif pair[0].col == pair[1].col:
-                cells_to_update.append(board[pair[0].row, :])
+                cells_to_update = board[:, pair[0].col]
+
+                # cells_to_update = board[pair[0].row, :]
 
             
             for cell in cells_to_update:
@@ -457,34 +433,6 @@ def pointing_numbers_col(board, col):
 
 def pointing_numbers_square(board, square):
     return pointing_numbers_cells(board, square, 'square')
-
-
-
-# REMOVE THIS
-# board = np.array([  [0, 0, 8, 0, 0, 0, 0, 0, 0],
-#                     [0, 0, 0, 0, 0, 0, 0, 0, 0],
-#                     [3, 5, 0, 0, 0, 0, 0, 0, 0],
-#                     [2, 0, 0, 0, 0, 0, 0, 0, 0],
-#                     [8, 0, 0, 0, 0, 0, 0, 0, 0],
-#                     [5, 0, 0, 0, 0, 0, 0, 0, 9],
-#                     [9, 0, 0, 0, 0, 0, 0, 0, 0],
-#                     [1, 0, 0, 0, 0, 0, 0, 0, 0],
-#                     [0, 0, 0, 0, 0, 0, 0, 0, 0]])
-# board = cell_board(board)
-# board_print(board)
-
-# board[-1,0].update_possible_num([4])
-# col = board[:,0]
-# pointing_numbers_col(board, col)
-
-# exit()
-
-################
-
-
-
-
-
 
 # Check if any duplicates in cells
 def check_correctness_cells(cells):
@@ -527,63 +475,91 @@ def check_correctness_of_board(board):
     
     return correct
 
+# Sums up the rows and make sure they all contain numbers 1-9, i.e. the sum is 45
+def check_solved(board):
+    for row in board:
+        if not np.sum(get_num_from_cells(row)) == 45:
+            return False
+
+    return True
+
 board = cell_board(board)
 board_print(board)
 
+# Tries to solve the board using logic. Can't handle any kind of xwing shenanigans
+def try_to_solve(board):
+    done = False
+    while not done:
+        update_something = False
 
-done = False
-while not done:
-    update_something = False
-
-    # Analyze rows
-    for i in range(n_num):
-        row = board[i,:]
-        update_something |= exclusion_cells_row(row)
-        update_something |= find_hidden_num_row(row)
-        update_something |= pointing_numbers_row(board, row)
-
-
-    # Analyze cols
-    for i in range(n_num):
-        col = board[:,i]
-        update_something |= exclusion_cells_col(col)
-        update_something |= find_hidden_num_col(col)
-        update_something |= pointing_numbers_col(board, col)
+        # Analyze rows
+        for i in range(n_num):
+            row = board[i,:]
+            update_something |= exclusion_cells_row(row)
+            update_something |= find_hidden_num_row(row)
+            update_something |= pointing_numbers_row(board, row)
 
 
-    # Analyze squares
-    if n_num == 9:
-        for square_i in range(0, n_num):
-            row_i = (square_i // 3)*3
-            col_i = (square_i % 3)*3
-            square = board[row_i:row_i+3, col_i:col_i+3]
-            update_something |= exclusion_cells_square(square)
-            update_something |= find_hidden_num_square(square)
-            update_something |= pointing_numbers_square(board, square)
-            
-
-    # Update all of the cells
-    for cell in board.reshape(-1):
-        cell.check_if_only_one_possible_num()
-
-    # If anything was updated then start over if not the soduko is solved
-    if not update_something:
-        done = True
+        # Analyze cols
+        for i in range(n_num):
+            col = board[:,i]
+            update_something |= exclusion_cells_col(col)
+            update_something |= find_hidden_num_col(col)
+            update_something |= pointing_numbers_col(board, col)
 
 
+        # Analyze squares
+        if n_num == 9:
+            for square_i in range(0, n_num):
+                row_i = (square_i // 3)*3
+                col_i = (square_i % 3)*3
+                square = board[row_i:row_i+3, col_i:col_i+3]
+                update_something |= exclusion_cells_square(square)
+                update_something |= find_hidden_num_square(square)
+                update_something |= pointing_numbers_square(board, square)
+                
+
+        # Update all of the cells
+        for cell in board.reshape(-1):
+            cell.check_if_only_one_possible_num()
+
+        # If anything was updated then start over if not the soduko is solved
+        if not update_something:
+            done = True
+
+
+
+try_to_solve(board)
+
+# If it's not solved by now try to randomize a good number
+import copy
+last_known_good_board = copy.deepcopy(board)
+done = check_solved(board)
+
+for cell in last_known_good_board.reshape(-1):
+    for num in cell.possible_nums:
+        board[cell.row, cell.col].possible_nums = {num}
+        try:
+            try_to_solve(board)
+        except:
+            board = copy.deepcopy(last_known_good_board)
+
+        if check_solved(board):
+            done = True
+            break
+    
+    if done:
+        break
+
+
+
+    
 correct = check_correctness_of_board(board)
 if not correct:
     print("Incorrect solution generated")
 else:
     print("Done:")
 
-
-
-# REMOVE THIS
-col = board[:,0]
-balle = pointing_numbers_cells(board, col, 'col')
-
-############### 
 
 
 board_print(board)
