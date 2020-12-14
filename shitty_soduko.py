@@ -1,6 +1,7 @@
 import numpy as np
 from sudoku_generator import generate_sudoko
 import itertools
+import time
 
 n_num = 9
 
@@ -528,6 +529,7 @@ def try_to_solve(board):
 
 print("Press enter to start solving")
 input()
+start_time = time.time()
 try_to_solve(board)
 
 # If it's not solved by now try to randomize a good number
@@ -561,6 +563,8 @@ else:
 
 
 
+end_time = time.time()
+print("It took", end_time-start_time, "s to solve!")
 board_print(board)
 
 
