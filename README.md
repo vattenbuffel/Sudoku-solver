@@ -1,2 +1,2 @@
 # Sudoku-solver
-solves sudoku
+Pull the code and run shitty_soduko.py
